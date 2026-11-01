@@ -47,10 +47,11 @@ const voo = criarVoo();
 const audio = criarAudio();
 
 // Só para o teste automático inspecionar o estado da cena e do som.
-window.aviaoDebug = { cena, audio };
+window.aviaoDebug = { cena, audio, aplicarAcao };
 
 // ---------- ações ----------
 function aplicarAcao(acao) {
+  retomarSom(); // qualquer ação da terapeuta também traz o som de volta, se o navegador o pausou
   switch (acao) {
     case ACAO.PROXIMA_FASE:
       voo.proximaFase();
@@ -111,7 +112,11 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// Há uma cena em andamento (notebook ou RV)? Fora disso o som não deve voltar sozinho.
+let modoAtivo = false;
+
 function iniciarModoNotebook() {
+  modoAtivo = true;
   elInicio.classList.add('oculto');
   elPainel.classList.remove('oculto');
   elAviso.classList.remove('oculto');
@@ -185,12 +190,16 @@ async function entrarNaRV() {
   renderer.xr.setReferenceSpaceType('local');
   renderer.xr.setFoveation(1);
   await renderer.xr.setSession(sessao);
+  audio.acompanharSessao(sessao);
+  modoAtivo = true;
   elErro.classList.add('oculto');
   elInicio.classList.add('oculto');
   quadrosNaSessao = 0;
   recentralizarPendente = true;
   sessao.addEventListener('end', () => {
     // O voo continua no estado em que estava; volta a tela inicial para entrar de novo.
+    // O som é suspenso por audio.acompanharSessao e volta no próximo "Entrar no avião".
+    modoAtivo = false;
     elInicio.classList.remove('oculto');
     rig.position.set(0, 0, 0);
     rig.rotation.set(0, 0, 0);
@@ -215,7 +224,7 @@ elEntrar.addEventListener('click', async () => {
 
 // O navegador pode suspender o som (ex.: aba em segundo plano); retoma no próximo toque.
 function retomarSom() {
-  if (audio.estado === 'suspended') audio.iniciar();
+  if (modoAtivo && audio.estado === 'suspended') audio.iniciar();
 }
 document.addEventListener('visibilitychange', retomarSom);
 window.addEventListener('pointerdown', retomarSom);

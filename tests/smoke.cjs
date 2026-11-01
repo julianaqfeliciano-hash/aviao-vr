@@ -116,6 +116,43 @@ async function principal() {
     await espera(2600);
     await foto('pouso-parado.png');
 
+    // Som acompanha a sessão de RV (sessão simulada): para ao tirar o óculos ou sair da RV,
+    // volta ao recolocar, com gatilho/botão lateral ou com qualquer ação do controle.
+    const ciclo = await pagina.evaluate(async () => {
+      const { audio, aplicarAcao } = window.aviaoDebug;
+      const estado = async (alvo) => {
+        for (let i = 0; i < 100 && audio.estado !== alvo; i++) await new Promise((r) => setTimeout(r, 20));
+        return audio.estado;
+      };
+      const sessao = new EventTarget();
+      sessao.visibilityState = 'visible';
+      audio.acompanharSessao(sessao);
+      const r = {};
+      sessao.visibilityState = 'hidden';
+      sessao.dispatchEvent(new Event('visibilitychange'));
+      r.oculto = await estado('suspended');
+      sessao.visibilityState = 'visible';
+      sessao.dispatchEvent(new Event('visibilitychange'));
+      r.visivel = await estado('running');
+      sessao.dispatchEvent(new Event('end'));
+      r.fim = await estado('suspended');
+      sessao.dispatchEvent(new Event('selectstart'));
+      r.gatilho = await estado('running');
+      sessao.dispatchEvent(new Event('end'));
+      await estado('suspended');
+      sessao.dispatchEvent(new Event('squeezestart'));
+      r.lateral = await estado('running');
+      sessao.dispatchEvent(new Event('end'));
+      await estado('suspended');
+      aplicarAcao('turbulencia');
+      r.acao = await estado('running');
+      return r;
+    });
+    const esperado = { oculto: 'suspended', visivel: 'running', fim: 'suspended', gatilho: 'running', lateral: 'running', acao: 'running' };
+    if (JSON.stringify(ciclo) !== JSON.stringify(esperado)) {
+      throw new Error(`som não acompanha a sessão: ${JSON.stringify(ciclo)}`);
+    }
+
     // Quest recusando a sessão de RV: continua na tela inicial com mensagem, sem quebrar.
     const recusa = await navegador.newPage({ viewport: { width: 1280, height: 720 } });
     recusa.on('pageerror', (e) => erros.push(`pageerror (recusa): ${e.message}`));

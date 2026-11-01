@@ -164,6 +164,24 @@ export function criarAudio() {
       if (ctx.state === 'suspended') await ctx.resume();
     },
 
+    // Acompanha a sessão de RV: o som para quando o óculos é retirado (sessão oculta) ou
+    // quando a RV termina, e volta ao recolocar o óculos ou ao apertar gatilho/botão lateral.
+    acompanharSessao(sessao) {
+      const retomar = () => {
+        if (ctx && ctx.state === 'suspended') ctx.resume();
+      };
+      const suspender = () => {
+        if (ctx && ctx.state === 'running') ctx.suspend();
+      };
+      sessao.addEventListener('visibilitychange', () => {
+        if (sessao.visibilityState === 'hidden') suspender();
+        else retomar();
+      });
+      sessao.addEventListener('selectstart', retomar);
+      sessao.addEventListener('squeezestart', retomar);
+      sessao.addEventListener('end', suspender);
+    },
+
     atualizar(p) {
       if (!nos) return;
       const agora = ctx.currentTime;
