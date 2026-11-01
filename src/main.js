@@ -4,6 +4,7 @@ import { criarVoo, NOMES_FASES } from './flight.js';
 import { calcularTremor } from './tremor.js';
 import { acaoDaTecla, ACAO } from './input.js';
 import { criarCabine } from './cabin.js';
+import { criarPaisagem } from './outside.js';
 
 const NOMES_TURBULENCIA = ['desligada', 'leve', 'moderada', 'forte'];
 
@@ -22,7 +23,6 @@ renderer.xr.enabled = true;
 document.body.prepend(renderer.domElement);
 
 const cena = new THREE.Scene();
-cena.background = new THREE.Color(0x9fc4e8);
 cena.add(new THREE.HemisphereLight(0xffffff, 0xd8d2c8, 2.0));
 cena.add(new THREE.AmbientLight(0xffffff, 0.7));
 const sol = new THREE.DirectionalLight(0xfff2d8, 1.2);
@@ -36,8 +36,13 @@ cena.add(rig);
 
 const cabine = criarCabine();
 cena.add(cabine.grupo);
+const paisagem = criarPaisagem(cena);
+cena.add(paisagem.grupo);
 
 const voo = criarVoo();
+
+// Só para o teste automático inspecionar o estado da cena.
+window.aviaoDebug = { cena };
 
 // ---------- ações ----------
 function aplicarAcao(acao) {
@@ -131,6 +136,7 @@ renderer.setAnimationLoop(() => {
   tempo += dt;
   const p = voo.atualizar(dt);
   cabine.atualizar(calcularTremor(tempo, p.tremor));
+  paisagem.atualizar(p, tempo);
   atualizarPainel(p);
   renderer.render(cena, camera);
 });

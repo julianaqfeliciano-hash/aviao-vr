@@ -75,6 +75,45 @@ async function principal() {
     await painelContem('Cinto: ligado');
     await foto('cabine.png');
 
+    // Percurso completo, olhando mais para a janela (tempo acelerado 10×).
+    await pagina.goto(URL_APP);
+    await pagina.click('#entrar');
+    await painelContem('Fase 1 – Parado no portão');
+    await pagina.mouse.move(640, 360);
+    await pagina.mouse.down();
+    await pagina.mouse.move(750, 380, { steps: 5 });
+    await pagina.mouse.up();
+    await foto('portao.png');
+    await pagina.keyboard.press('Space');
+    await painelContem('Fase 2 – Taxiamento');
+    await espera(1000);
+    await foto('taxi.png');
+    await pagina.keyboard.press('Space');
+    await painelContem('Fase 3 – Decolagem');
+    // Vigia, a cada quadro, se a neblina chegou a "dentro da nuvem" durante a decolagem.
+    await pagina.evaluate(() => {
+      window.viuNuvem = false;
+      const vigiar = () => {
+        if (window.aviaoDebug.cena.fog.far < 100) window.viuNuvem = true;
+        else requestAnimationFrame(vigiar);
+      };
+      requestAnimationFrame(vigiar);
+    });
+    await espera(1100);
+    await foto('decolagem-chao.png');
+    await espera(1200);
+    await foto('decolagem-subida.png');
+    await painelContem('Fase 4 – Cruzeiro', 25000);
+    if (!(await pagina.evaluate(() => window.viuNuvem))) throw new Error('não atravessou a camada de nuvens na decolagem');
+    await espera(500);
+    await foto('cruzeiro.png');
+    await pagina.keyboard.press('Space');
+    await painelContem('Fase 5 – Descida e pouso');
+    await espera(4600);
+    await foto('pouso-aproximacao.png');
+    await espera(2600);
+    await foto('pouso-parado.png');
+
     if (erros.length) throw new Error(`erros na página:\n${erros.join('\n')}`);
     console.log('SMOKE OK');
   } finally {
