@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Avião VR</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #0d1b2a;
+        color: #f1f5f9;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      canvas {
+        display: block;
+      }
+      #inicio {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 16px;
+        text-align: center;
+        background: linear-gradient(#0d1b2a, #1b3a5c);
+      }
+      #inicio h1 {
+        margin: 0;
+        font-size: 2.4rem;
+      }
+      #inicio p {
+        margin: 0;
+        max-width: 34rem;
+        line-height: 1.5;
+        opacity: 0.85;
+      }
+      #entrar {
+        padding: 18px 40px;
+        border: 0;
+        border-radius: 999px;
+        background: #f59e0b;
+        color: #1f1300;
+        font-size: 1.5rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      #painel,
+      #aviso {
+        position: fixed;
+        left: 12px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.6);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      #painel {
+        top: 12px;
+        white-space: pre-line;
+      }
+      #aviso {
+        bottom: 12px;
+        right: 12px;
+      }
+      .oculto {
+        display: none !important;
+      }
+    </style>
+    <script type="importmap">
+      { "imports": { "three": "./vendor/three/three.module.js" } }
+    </script>
+  </head>
+  <body>
+    <div id="inicio">
+      <h1>Avião VR</h1>
+      <p>
+        Toque em “Entrar no avião”, coloque o óculos no paciente já sentado e clique no direcional do
+        controle para recentralizar.
+      </p>
+      <button id="entrar" type="button">Entrar no avião</button>
+    </div>
+    <div id="painel" class="oculto"></div>
+    <div id="aviso" class="oculto"></div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
