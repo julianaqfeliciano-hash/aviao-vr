@@ -29,6 +29,17 @@ test('nunca passa do limite em nenhum nível', () => {
   }
 });
 
+test('deslocamento e inclinação combinados (dois eixos juntos) nunca passam do limite', () => {
+  for (const n of [0.5, 1, 1.5, 2, 2.5, 3, 4]) {
+    const L = limiteTremor(n);
+    for (let t = 0; t < 300; t += 0.01) {
+      const s = calcularTremor(t, n);
+      assert.ok(Math.hypot(s.x, s.y) <= L.posicao + 1e-9, `pos n=${n} t=${t.toFixed(2)} ${Math.hypot(s.x, s.y)}`);
+      assert.ok(Math.hypot(s.rotX, s.rotZ) <= L.rotacao + 1e-9, `rot n=${n} t=${t.toFixed(2)} ${Math.hypot(s.rotX, s.rotZ)}`);
+    }
+  }
+});
+
 test('limite interpolado: nível 1,5 = 1 cm', () => {
   assert.ok(Math.abs(limiteTremor(1.5).posicao - 0.01) < 1e-12);
 });

@@ -60,13 +60,18 @@ function canal(t, nivel, semente) {
   return Math.min(1, Math.max(-1, s));
 }
 
+// Reduz o par (a, b) para que o módulo combinado não passe do limite.
+function limitarPar(a, b, limite) {
+  const modulo = Math.hypot(a, b);
+  const fator = modulo > limite ? limite / modulo : 1;
+  return [a * fator, b * fator];
+}
+
 export function calcularTremor(tempo, nivel) {
   if (nivel <= 0) return { x: 0, y: 0, rotX: 0, rotZ: 0 };
   const L = limiteTremor(nivel);
-  return {
-    x: canal(tempo, nivel, 1) * L.posicao * 0.6,
-    y: canal(tempo, nivel, 2) * L.posicao,
-    rotX: canal(tempo, nivel, 3) * L.rotacao,
-    rotZ: canal(tempo, nivel, 4) * L.rotacao,
-  };
+  // Os limites valem para o deslocamento e a inclinação combinados (dois eixos juntos).
+  const [x, y] = limitarPar(canal(tempo, nivel, 1) * L.posicao * 0.6, canal(tempo, nivel, 2) * L.posicao, L.posicao);
+  const [rotX, rotZ] = limitarPar(canal(tempo, nivel, 3) * L.rotacao, canal(tempo, nivel, 4) * L.rotacao, L.rotacao);
+  return { x, y, rotX, rotZ };
 }
