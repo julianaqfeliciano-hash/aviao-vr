@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { criarVoo, NOMES_FASES } from './flight.js';
 import { calcularTremor } from './tremor.js';
-import { acaoDaTecla, ACAO } from './input.js';
+import { acaoDaTecla, ACAO, criarLeitorControles, padraoVibracao, INTERVALO_MS } from './input.js';
+import { calcularRecentralizacao } from './recentrar.js';
 import { criarCabine } from './cabin.js';
 import { criarPaisagem } from './outside.js';
 import { criarAudio } from './audio.js';
@@ -16,6 +17,7 @@ const elInicio = document.querySelector('#inicio');
 const elEntrar = document.querySelector('#entrar');
 const elPainel = document.querySelector('#painel');
 const elAviso = document.querySelector('#aviso');
+const elErro = document.querySelector('#erro');
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -30,7 +32,7 @@ const sol = new THREE.DirectionalLight(0xfff2d8, 1.2);
 sol.position.set(-5, 6, 2);
 cena.add(sol);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 30000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 30000);
 const rig = new THREE.Group();
 rig.add(camera);
 cena.add(rig);
@@ -62,6 +64,9 @@ function aplicarAcao(acao) {
     case ACAO.CINTO:
       cabine.definirCinto(voo.alternarCinto());
       audio.tocar('ding');
+      break;
+    case ACAO.RECENTRALIZAR:
+      recentralizar();
       break;
     default:
       break;
@@ -115,9 +120,97 @@ function iniciarModoNotebook() {
     '0 = desliga turbulência · C = cinto · arraste o mouse para olhar';
 }
 
+// ---------- realidade virtual ----------
+const leitorControles = criarLeitorControles();
+let quadrosNaSessao = 0;
+let recentralizarPendente = false;
+
+// Coloca a cabeça atual no ponto dos olhos do assento, olhando para a frente.
+function recentralizar() {
+  recentralizarPendente = false;
+  if (!renderer.xr.isPresenting) return;
+  const yaw = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ').y;
+  const r = calcularRecentralizacao(camera.position, yaw, cabine.olhos);
+  rig.position.set(r.posicao.x, r.posicao.y, r.posicao.z);
+  rig.rotation.set(0, r.rotacaoY, 0);
+}
+
+function pulso(gamepad, intensidade, duracaoMs) {
+  try {
+    const atuador = gamepad.hapticActuators?.[0];
+    if (atuador?.pulse) {
+      atuador.pulse(intensidade, duracaoMs)?.catch?.(() => {});
+      return;
+    }
+    gamepad.vibrationActuator
+      ?.playEffect?.('dual-rumble', { duration: duracaoMs, strongMagnitude: intensidade, weakMagnitude: intensidade })
+      ?.catch?.(() => {});
+  } catch {
+    // vibração é só confirmação; sem ela a sessão continua
+  }
+}
+
+function vibrar(gamepad, padrao) {
+  if (!gamepad) return;
+  let atraso = 0;
+  for (const { duracaoMs, intensidade } of padrao) {
+    setTimeout(() => pulso(gamepad, intensidade, duracaoMs), atraso);
+    atraso += duracaoMs + INTERVALO_MS;
+  }
+}
+
+function lerControles(sessao) {
+  const controles = [];
+  for (const fonte of sessao.inputSources) {
+    if (!fonte.gamepad || fonte.handedness === 'none') continue;
+    controles.push({ mao: fonte.handedness, botoes: fonte.gamepad.buttons.map((b) => b.pressed), gamepad: fonte.gamepad });
+  }
+  for (const { acao, mao } of leitorControles.ler(controles)) {
+    aplicarAcao(acao);
+    const estado = { numeroFase: voo.numeroFase, turbulencia: voo.turbulencia };
+    vibrar(controles.find((c) => c.mao === mao)?.gamepad, padraoVibracao(acao, estado));
+  }
+}
+
+const suporteRV = (async () => {
+  try {
+    return Boolean(await navigator.xr?.isSessionSupported('immersive-vr'));
+  } catch {
+    return false;
+  }
+})();
+
+async function entrarNaRV() {
+  const sessao = await navigator.xr.requestSession('immersive-vr');
+  renderer.xr.setReferenceSpaceType('local');
+  renderer.xr.setFoveation(1);
+  await renderer.xr.setSession(sessao);
+  elErro.classList.add('oculto');
+  elInicio.classList.add('oculto');
+  quadrosNaSessao = 0;
+  recentralizarPendente = true;
+  sessao.addEventListener('end', () => {
+    // O voo continua no estado em que estava; volta a tela inicial para entrar de novo.
+    elInicio.classList.remove('oculto');
+    rig.position.set(0, 0, 0);
+    rig.rotation.set(0, 0, 0);
+    aplicarOlhar();
+  });
+}
+
 elEntrar.addEventListener('click', async () => {
-  await audio.iniciar();
-  iniciarModoNotebook();
+  const somPronto = audio.iniciar(); // cria o som ainda dentro do toque do usuário
+  if (await suporteRV) {
+    try {
+      await entrarNaRV();
+    } catch {
+      elErro.textContent = 'Não foi possível entrar na realidade virtual. Toque no botão para tentar de novo.';
+      elErro.classList.remove('oculto');
+    }
+  } else {
+    iniciarModoNotebook();
+  }
+  await somPronto;
 });
 
 // O navegador pode suspender o som (ex.: aba em segundo plano); retoma no próximo toque.
@@ -147,6 +240,11 @@ let tempo = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(relogio.getDelta(), 0.1) * acelerar;
   tempo += dt;
+  if (renderer.xr.isPresenting) {
+    lerControles(renderer.xr.getSession());
+    quadrosNaSessao += 1;
+    if (recentralizarPendente && quadrosNaSessao >= 10) recentralizar();
+  }
   const p = voo.atualizar(dt);
   cabine.atualizar(calcularTremor(tempo, p.tremor));
   paisagem.atualizar(p, tempo);

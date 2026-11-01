@@ -116,6 +116,32 @@ async function principal() {
     await espera(2600);
     await foto('pouso-parado.png');
 
+    // Quest recusando a sessão de RV: continua na tela inicial com mensagem, sem quebrar.
+    const recusa = await navegador.newPage({ viewport: { width: 1280, height: 720 } });
+    recusa.on('pageerror', (e) => erros.push(`pageerror (recusa): ${e.message}`));
+    await recusa.addInitScript(() => {
+      Object.defineProperty(navigator, 'xr', {
+        configurable: true,
+        value: {
+          isSessionSupported: async () => true,
+          requestSession: async () => {
+            throw new Error('recusado');
+          },
+        },
+      });
+    });
+    await recusa.goto(URL_APP);
+    await recusa.click('#entrar');
+    await recusa
+      .waitForFunction(() => document.querySelector('#erro')?.textContent.includes('Não foi possível entrar na realidade virtual'), null, {
+        timeout: 5000,
+      })
+      .catch(() => {
+        throw new Error('sem mensagem de erro quando a RV é recusada');
+      });
+    if (!(await recusa.isVisible('#inicio'))) throw new Error('tela inicial sumiu após recusa da RV');
+    if (await recusa.isVisible('#painel')) throw new Error('modo notebook ativado após recusa da RV');
+
     if (erros.length) throw new Error(`erros na página:\n${erros.join('\n')}`);
     console.log('SMOKE OK');
   } finally {
