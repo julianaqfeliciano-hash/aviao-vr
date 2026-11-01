@@ -62,6 +62,8 @@ async function principal() {
     await painelContem('Fase 1 – Parado no portão');
     await painelContem('Turbulência: desligada');
     await painelContem('Cinto: desligado');
+    const estadoAudio = await pagina.evaluate(() => window.aviaoDebug.audio?.estado);
+    if (estadoAudio !== 'running') throw new Error(`som não iniciou (estado: ${estadoAudio})`);
     const aviso = await pagina.textContent('#aviso');
     if (!aviso.includes('RV indisponível neste aparelho')) throw new Error(`aviso inesperado: "${aviso}"`);
 

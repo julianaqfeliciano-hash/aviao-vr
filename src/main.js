@@ -5,6 +5,7 @@ import { calcularTremor } from './tremor.js';
 import { acaoDaTecla, ACAO } from './input.js';
 import { criarCabine } from './cabin.js';
 import { criarPaisagem } from './outside.js';
+import { criarAudio } from './audio.js';
 
 const NOMES_TURBULENCIA = ['desligada', 'leve', 'moderada', 'forte'];
 
@@ -41,8 +42,10 @@ cena.add(paisagem.grupo);
 
 const voo = criarVoo();
 
-// Só para o teste automático inspecionar o estado da cena.
-window.aviaoDebug = { cena };
+const audio = criarAudio();
+
+// Só para o teste automático inspecionar o estado da cena e do som.
+window.aviaoDebug = { cena, audio };
 
 // ---------- ações ----------
 function aplicarAcao(acao) {
@@ -58,6 +61,7 @@ function aplicarAcao(acao) {
       break;
     case ACAO.CINTO:
       cabine.definirCinto(voo.alternarCinto());
+      audio.tocar('ding');
       break;
     default:
       break;
@@ -111,9 +115,18 @@ function iniciarModoNotebook() {
     '0 = desliga turbulência · C = cinto · arraste o mouse para olhar';
 }
 
-elEntrar.addEventListener('click', () => {
+elEntrar.addEventListener('click', async () => {
+  await audio.iniciar();
   iniciarModoNotebook();
 });
+
+// O navegador pode suspender o som (ex.: aba em segundo plano); retoma no próximo toque.
+function retomarSom() {
+  if (audio.estado === 'suspended') audio.iniciar();
+}
+document.addEventListener('visibilitychange', retomarSom);
+window.addEventListener('pointerdown', retomarSom);
+window.addEventListener('keydown', retomarSom);
 
 // ---------- painel ----------
 let textoPainel = '';
@@ -137,6 +150,8 @@ renderer.setAnimationLoop(() => {
   const p = voo.atualizar(dt);
   cabine.atualizar(calcularTremor(tempo, p.tremor));
   paisagem.atualizar(p, tempo);
+  audio.atualizar(p);
+  for (const evento of p.eventos) audio.tocar(evento);
   atualizarPainel(p);
   renderer.render(cena, camera);
 });
