@@ -170,3 +170,15 @@ test('cinto alterna e aparece nos parâmetros', () => {
   assert.equal(v.alternarCinto(), false);
   assert.equal(v.atualizar(0.1).cinto, false);
 });
+
+test('A no meio do pouso volta ao portão parado, sem eventos', () => {
+  const v = criarVoo();
+  irParaFase(v, 'pouso');
+  v.atualizar(40);
+  assert.equal(v.proximaFase(), 1);
+  const p = v.atualizar(0.016);
+  assert.equal(p.fase, 'portao');
+  assert.equal(p.altitude, 0);
+  assert.equal(p.velocidade, 0);
+  assert.deepEqual(p.eventos, []);
+});

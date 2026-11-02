@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calcularTremor, limiteTremor, LIMITES_TREMOR } from '../src/tremor.js';
+import { calcularTremor, limiteTremor, LIMITES_TREMOR, fatorBalanco } from '../src/tremor.js';
 
 const GRAU = Math.PI / 180;
 
@@ -58,4 +58,12 @@ test('nível 1 se mexe de forma perceptível', () => {
 
 test('determinístico', () => {
   assert.deepEqual(calcularTremor(12.3, 2), calcularTremor(12.3, 2));
+});
+
+test('balanço da paisagem cresce aos poucos com a altitude (sem salto na decolagem/toque)', () => {
+  assert.equal(fatorBalanco(0), 1);
+  assert.equal(fatorBalanco(30), 100);
+  assert.equal(fatorBalanco(700), 100);
+  assert.ok(Math.abs(fatorBalanco(15) - 50.5) < 1e-9);
+  for (let h = 0; h < 30; h += 0.5) assert.ok(fatorBalanco(h + 0.5) - fatorBalanco(h) <= 1.65 + 1e-9);
 });

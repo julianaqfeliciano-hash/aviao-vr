@@ -75,3 +75,11 @@ export function calcularTremor(tempo, nivel) {
   const [rotX, rotZ] = limitarPar(canal(tempo, nivel, 3) * L.rotacao, canal(tempo, nivel, 4) * L.rotacao, L.rotacao);
   return { x, y, rotX, rotZ };
 }
+
+// Quanto o balanço da turbulência é ampliado na paisagem: 1× no chão, até 100× no ar,
+// crescendo nos primeiros 30 m de altitude (sem salto na decolagem e no toque).
+const ALTITUDE_BALANCO_PLENO = 30;
+export function fatorBalanco(altitude) {
+  const f = Math.min(1, Math.max(0, altitude / ALTITUDE_BALANCO_PLENO));
+  return 1 + 99 * f;
+}

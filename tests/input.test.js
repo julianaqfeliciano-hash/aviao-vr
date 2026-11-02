@@ -9,6 +9,7 @@ import {
   CURTO,
   LONGO,
   INTERVALO_MS,
+  ehControle,
 } from '../src/input.js';
 
 const solto = [false, false, false, false, false, false];
@@ -108,4 +109,25 @@ test('vibrações', () => {
   assert.deepEqual(padraoVibracao('desligar-turbulencia', { numeroFase: 1, turbulencia: 0 }), [LONGO]);
   assert.deepEqual(padraoVibracao('cinto', { numeroFase: 1, turbulencia: 0 }), [CURTO]);
   assert.deepEqual(padraoVibracao('recentralizar', { numeroFase: 1, turbulencia: 0 }), [CURTO]);
+});
+
+test('teclas com Ctrl, Cmd ou Alt não disparam ações (atalhos do navegador)', () => {
+  assert.equal(acaoDaTecla({ code: 'KeyC', repeat: false, ctrlKey: true }), null);
+  assert.equal(acaoDaTecla({ code: 'Digit0', repeat: false, metaKey: true }), null);
+  assert.equal(acaoDaTecla({ code: 'KeyT', repeat: false, altKey: true }), null);
+  assert.equal(acaoDaTecla({ code: 'KeyT', repeat: false, shiftKey: true }), 'turbulencia');
+});
+
+test('só controles contam: mãos (rastreamento de mãos) são ignoradas', () => {
+  assert.equal(ehControle({ hand: {}, profiles: [] }), false);
+  assert.equal(ehControle({ hand: null, profiles: ['generic-hand-select', 'generic-hand'] }), false);
+  assert.equal(ehControle({ hand: null, profiles: ['meta-quest-touch-plus', 'generic-trigger-squeeze-thumbstick'] }), true);
+  assert.equal(ehControle({}), true);
+});
+
+test('reiniciar o leitor (nova sessão): botão já apertado não dispara', () => {
+  const l = criarLeitorControles();
+  l.ler([{ mao: 'right', botoes: solto }]);
+  l.reiniciar();
+  assert.deepEqual(l.ler([{ mao: 'right', botoes: com(4) }]), []);
 });

@@ -20,10 +20,21 @@ const ACAO_DO_BOTAO = [
   [BOTOES.B_Y, ACAO.TURBULENCIA],
 ];
 
+// Mãos rastreadas (sem controle) aparecem como fontes de entrada: a pinça viraria "gatilho".
+export function ehControle({ hand, profiles } = {}) {
+  if (hand) return false;
+  return !(profiles ?? []).some((perfil) => perfil.startsWith('generic-hand'));
+}
+
 export function criarLeitorControles() {
   const anteriores = new Map(); // mao -> boolean[]
 
   return {
+    // Esquece o estado anterior (nova sessão de RV): controle já apertado não dispara.
+    reiniciar() {
+      anteriores.clear();
+    },
+
     ler(controles) {
       const acoes = [];
       const vistos = new Set();
@@ -53,8 +64,8 @@ const ACAO_DA_TECLA = {
   KeyC: ACAO.CINTO,
 };
 
-export function acaoDaTecla({ code, repeat }) {
-  if (repeat) return null;
+export function acaoDaTecla({ code, repeat, ctrlKey, metaKey, altKey }) {
+  if (repeat || ctrlKey || metaKey || altKey) return null; // deixa os atalhos do navegador em paz
   return ACAO_DA_TECLA[code] ?? null;
 }
 
