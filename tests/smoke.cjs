@@ -42,6 +42,7 @@ async function principal() {
     pagina.on('pageerror', (e) => erros.push(`pageerror: ${e.message}`));
     pagina.on('console', (m) => {
       if (m.type() === 'error') erros.push(`console: ${m.text()}`);
+      if (m.type() === 'warning' && /deprecat/i.test(m.text())) erros.push(`aviso de obsoleto: ${m.text()}`);
     });
 
     const painelContem = (texto, timeout = 5000) =>
@@ -152,6 +153,51 @@ async function principal() {
     if (JSON.stringify(ciclo) !== JSON.stringify(esperado)) {
       throw new Error(`som não acompanha a sessão: ${JSON.stringify(ciclo)}`);
     }
+
+    // Taxiamento longo (exposição prolongada, 25 min): a faixa de taxiamento continua sob o avião.
+    const taxi = await navegador.newPage({ viewport: { width: 1280, height: 720 } });
+    taxi.on('pageerror', (e) => erros.push(`pageerror (taxi): ${e.message}`));
+    await taxi.goto(URL_APP);
+    await taxi.click('#entrar');
+    await taxi.keyboard.press('Space');
+    await taxi.evaluate(() => window.aviaoDebug.voo.atualizar(1500));
+    await espera(500);
+    const faixa = await taxi.evaluate(() => {
+      const malha = window.aviaoDebug.cena.getObjectByName('faixa-taxi');
+      if (!malha) return 'sem faixa';
+      malha.updateWorldMatrix(true, false);
+      malha.geometry.computeBoundingBox();
+      const caixa = malha.geometry.boundingBox.clone().applyMatrix4(malha.matrixWorld);
+      return caixa.min.z <= -100 && caixa.max.z >= 100 ? 'ok' : `faixa de z=${caixa.min.z.toFixed(0)} a ${caixa.max.z.toFixed(0)}`;
+    });
+    if (faixa !== 'ok') throw new Error(`faixa de taxiamento não está sob o avião após 25 min: ${faixa}`);
+    await taxi.close();
+
+    // Falha no meio da abertura da RV: a sessão é encerrada (não fica aberta pela metade).
+    const falha = await navegador.newPage({ viewport: { width: 1280, height: 720 } });
+    falha.on('pageerror', (e) => erros.push(`pageerror (falha): ${e.message}`));
+    await falha.addInitScript(() => {
+      window.sessaoEncerrada = false;
+      const sessao = new EventTarget();
+      sessao.end = async () => {
+        window.sessaoEncerrada = true;
+      };
+      Object.defineProperty(navigator, 'xr', {
+        configurable: true,
+        value: { isSessionSupported: async () => true, requestSession: async () => sessao },
+      });
+    });
+    await falha.goto(URL_APP);
+    await falha.click('#entrar');
+    await falha
+      .waitForFunction(() => document.querySelector('#erro')?.textContent.includes('Não foi possível entrar na realidade virtual'), null, {
+        timeout: 5000,
+      })
+      .catch(() => {
+        throw new Error('sem mensagem de erro quando a abertura da RV falha');
+      });
+    if (!(await falha.evaluate(() => window.sessaoEncerrada))) throw new Error('sessão de RV ficou aberta após falha');
+    await falha.close();
 
     // Quest recusando a sessão de RV: continua na tela inicial com mensagem, sem quebrar.
     const recusa = await navegador.newPage({ viewport: { width: 1280, height: 720 } });

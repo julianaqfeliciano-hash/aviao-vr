@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { criarVoo, NOMES_FASES } from './flight.js';
 import { calcularTremor } from './tremor.js';
-import { acaoDaTecla, ACAO, criarLeitorControles, padraoVibracao, INTERVALO_MS } from './input.js';
+import { acaoDaTecla, ACAO, criarLeitorControles, padraoVibracao, INTERVALO_MS, ehControle } from './input.js';
 import { calcularRecentralizacao } from './recentrar.js';
 import { criarCabine } from './cabin.js';
 import { criarPaisagem } from './outside.js';
@@ -47,7 +47,7 @@ const voo = criarVoo();
 const audio = criarAudio();
 
 // Só para o teste automático inspecionar o estado da cena e do som.
-window.aviaoDebug = { cena, audio, aplicarAcao };
+window.aviaoDebug = { cena, audio, voo, aplicarAcao };
 
 // ---------- ações ----------
 function aplicarAcao(acao) {
@@ -167,7 +167,7 @@ function vibrar(gamepad, padrao) {
 function lerControles(sessao) {
   const controles = [];
   for (const fonte of sessao.inputSources) {
-    if (!fonte.gamepad || fonte.handedness === 'none') continue;
+    if (!fonte.gamepad || fonte.handedness === 'none' || !ehControle(fonte)) continue;
     controles.push({ mao: fonte.handedness, botoes: fonte.gamepad.buttons.map((b) => b.pressed), gamepad: fonte.gamepad });
   }
   for (const { acao, mao } of leitorControles.ler(controles)) {
@@ -187,9 +187,20 @@ const suporteRV = (async () => {
 
 async function entrarNaRV() {
   const sessao = await navigator.xr.requestSession('immersive-vr');
-  renderer.xr.setReferenceSpaceType('local');
-  renderer.xr.setFoveation(1);
-  await renderer.xr.setSession(sessao);
+  try {
+    renderer.xr.setReferenceSpaceType('local');
+    renderer.xr.setFoveation(1);
+    await renderer.xr.setSession(sessao);
+  } catch (erro) {
+    // Não deixa a RV aberta pela metade: encerra para que a próxima tentativa funcione.
+    try {
+      await sessao.end();
+    } catch {
+      // já encerrada
+    }
+    throw erro;
+  }
+  leitorControles.reiniciar(); // nova sessão: botões já apertados não disparam
   audio.acompanharSessao(sessao);
   modoAtivo = true;
   elErro.classList.add('oculto');
@@ -244,10 +255,13 @@ function atualizarPainel(p) {
 }
 
 // ---------- laço ----------
-const relogio = new THREE.Clock();
 let tempo = 0;
-renderer.setAnimationLoop(() => {
-  const dt = Math.min(relogio.getDelta(), 0.1) * acelerar;
+let ultimoQuadroMs = null;
+renderer.setAnimationLoop((agoraMs) => {
+  // Limite de 0,1 s por quadro: se a sessão pausar (óculos retirado), o voo pausa junto.
+  const delta = ultimoQuadroMs === null ? 0 : Math.max(0, (agoraMs - ultimoQuadroMs) / 1000);
+  ultimoQuadroMs = agoraMs;
+  const dt = Math.min(delta, 0.1) * acelerar;
   tempo += dt;
   if (renderer.xr.isPresenting) {
     lerControles(renderer.xr.getSession());

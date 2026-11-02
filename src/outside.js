@@ -2,7 +2,7 @@
 // O avião fica fixo na origem; a paisagem se move e inclina em volta dele.
 import * as THREE from 'three';
 import { PERFIL } from './flight.js';
-import { calcularTremor } from './tremor.js';
+import { calcularTremor, fatorBalanco } from './tremor.js';
 
 export const NUVENS = { base: 400, topo: 550 };
 
@@ -12,6 +12,7 @@ const TAMANHO_LADRILHO = 400; // m por repetição da textura do chão
 const AREA_NUVENS = 6000;
 const QTD_NUVENS = 140;
 const PISTA = { comprimento: 3000, largura: 45 };
+const FAIXA_TAXI = { comprimento: 6000, centroZ: -2750, periodo: 60 }; // periodo = 1 repetição da textura
 const CABECEIRA_DECOLAGEM = -100; // a cabeceira fica 100 m atrás no início da decolagem
 const CABECEIRA_POUSO = PERFIL.pouso.distanciaToque - 300;
 
@@ -137,9 +138,11 @@ function criarAeroporto() {
       c.fillRect(l / 2 - 2, 0, 4, a);
     },
     1,
-    6000 / 60,
+    FAIXA_TAXI.comprimento / FAIXA_TAXI.periodo,
   );
-  grupo.add(plano(40, 6000, new THREE.MeshLambertMaterial({ map: pistaTaxi }), 0, 0.08, -2750));
+  const faixaTaxi = plano(40, FAIXA_TAXI.comprimento, new THREE.MeshLambertMaterial({ map: pistaTaxi }), 0, 0.08, FAIXA_TAXI.centroZ);
+  faixaTaxi.name = 'faixa-taxi';
+  grupo.add(faixaTaxi);
 
   const fachada = texturaCanvas(
     256,
@@ -237,6 +240,7 @@ export function criarPaisagem(cena) {
   const ceu = criarCeu();
   const chao = criarChao();
   const aeroporto = criarAeroporto();
+  const faixaTaxi = aeroporto.getObjectByName('faixa-taxi');
   const pista = criarPista();
   const nuvens = criarNuvens();
   mundo.add(chao.malha, aeroporto, pista, nuvens.malha);
@@ -251,7 +255,8 @@ export function criarPaisagem(cena) {
     atualizar(p, tempo) {
       const tremor = calcularTremor(tempo, p.tremor);
       // No ar a paisagem balança alguns metros; no chão, só o tremor da própria cabine.
-      const balanco = tremor.y * (p.noChao ? 1 : 100);
+      // A ampliação cresce nos primeiros 30 m de altitude, sem salto na decolagem e no toque.
+      const balanco = tremor.y * fatorBalanco(p.altitude);
       pivo.rotation.x = -THREE.MathUtils.degToRad(p.inclinacao);
       mundo.position.y = -(p.altitude + ALTURA_PISO_SOBRE_SOLO) + balanco;
 
@@ -259,7 +264,12 @@ export function criarPaisagem(cena) {
 
       const noAeroporto = p.fase === 'portao' || p.fase === 'taxi';
       aeroporto.visible = noAeroporto;
-      if (noAeroporto) aeroporto.position.z = p.distanciaNaFase;
+      if (noAeroporto) {
+        aeroporto.position.z = p.distanciaNaFase; // terminal e pátio ficam para trás
+        // A faixa de taxiamento acompanha o avião, deslizando só dentro de uma repetição da
+        // textura: as marcas passam, mas a faixa nunca acaba (taxiamento pode durar muito).
+        faixaTaxi.position.z = FAIXA_TAXI.centroZ - p.distanciaNaFase + modulo(p.distanciaNaFase, FAIXA_TAXI.periodo);
+      }
 
       pista.visible = p.fase === 'decolagem' || p.fase === 'pouso';
       if (p.fase === 'decolagem') pista.position.z = p.distanciaNaFase - CABECEIRA_DECOLAGEM;

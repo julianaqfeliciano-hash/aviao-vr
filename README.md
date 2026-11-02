@@ -71,12 +71,14 @@ Marque cada item no primeiro teste e me conte o que não funcionou ou incomodou:
 - [ ] **A** avança a fase e o controle vibra o número da fase
 - [ ] **B** muda a turbulência e o controle vibra conforme o nível
 - [ ] O **botão lateral** desliga a turbulência com uma vibração longa
+- [ ] Segurar o controle normalmente **não** aperta o botão lateral sem querer (a turbulência não desliga sozinha)
 - [ ] O **gatilho** acende a luz de cinto com "ding"
 - [ ] Os controles **não** aparecem na cena
 - [ ] As 5 fases funcionam (portão, taxiamento, decolagem, cruzeiro, pouso)
 - [ ] Os 3 níveis de turbulência são perceptíveis e diferentes entre si
 - [ ] Há som em todas as fases (motores, "ding", trem de pouso, toque na pista)
 - [ ] A turbulência leve não causa enjoo perceptível
+- [ ] Os trancos da turbulência forte são intensos, mas toleráveis para o protocolo
 - [ ] A imagem é fluida, sem travamentos
 
 ## Versões
